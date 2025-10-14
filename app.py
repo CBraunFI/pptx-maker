@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from models import RenderRequest, RenderResponse
 from pptx_builder import build_base64, build_pptx, sanitize_text
+from urllib.parse import quote
 
 app = FastAPI(title="PPTX Maker")
 
@@ -44,13 +45,16 @@ def render_pptx_bytes(req: RenderRequest):
         customer = sanitize_text(req.deck.meta.customer)
         title = sanitize_text(req.deck.meta.deckTitle)
         filename = f"{customer} - {title}.pptx"
+        # URL-encode filename for HTTP header (RFC 5987)
+        filename_encoded = quote(filename)
+
         pptx_bytes = build_pptx(req.deck.model_dump())
 
         return Response(
             content=pptx_bytes,
             media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": f"attachment; filename*=UTF-8''{filename_encoded}"
             }
         )
     except Exception as e:
