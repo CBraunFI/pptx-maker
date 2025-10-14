@@ -1,5 +1,6 @@
 import io, base64
 import os
+import unicodedata
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
@@ -8,6 +9,38 @@ from typing import List, Union
 def hex_to_rgb(hexstr: str):
     hexstr = hexstr.lstrip("#")
     return RGBColor(int(hexstr[0:2],16), int(hexstr[2:4],16), int(hexstr[4:6],16))
+
+def sanitize_text(text: str) -> str:
+    """
+    Sanitize text to avoid encoding issues with python-pptx.
+    Replaces problematic Unicode characters with ASCII equivalents.
+    """
+    if not text:
+        return text
+
+    # Replace common problematic Unicode characters
+    replacements = {
+        '\u2013': '-',  # En dash
+        '\u2014': '-',  # Em dash
+        '\u2018': "'",  # Left single quotation mark
+        '\u2019': "'",  # Right single quotation mark
+        '\u201C': '"',  # Left double quotation mark
+        '\u201D': '"',  # Right double quotation mark
+        '\u2026': '...',  # Horizontal ellipsis
+        '\u00A0': ' ',  # Non-breaking space
+    }
+
+    for unicode_char, ascii_char in replacements.items():
+        text = text.replace(unicode_char, ascii_char)
+
+    # Normalize to closest ASCII equivalent for remaining characters
+    # NFKD = Compatibility Decomposition
+    text = unicodedata.normalize('NFKD', text)
+
+    # Keep only ASCII characters (latin-1 safe)
+    text = text.encode('ascii', 'ignore').decode('ascii')
+
+    return text
 
 def add_logos(slide, synk_logo_path, client_logo_path, slide_width, slide_height):
     """Add SYNK logo to bottom right and client logo to bottom left of a slide"""
@@ -43,13 +76,13 @@ def add_title_slide(prs, meta, slide):
     # title
     tb = s.shapes.add_textbox(Inches(1), Inches(1.7), prs.slide_width - Inches(2), Inches(1.2))
     p = tb.text_frame.paragraphs[0]
-    p.text = slide["title"]
+    p.text = sanitize_text(slide["title"])
     p.font.name = "Arial"; p.font.size = Pt(44); p.font.bold = True; p.font.color.rgb = RGBColor(255,255,255)
     tb.text_frame.word_wrap = True
     # subtitle
     sub = s.shapes.add_textbox(Inches(1), Inches(2.7), prs.slide_width - Inches(2), Inches(0.8))
     sp = sub.text_frame.paragraphs[0]
-    sp.text = slide.get("subtitle") or (meta["deckSubtitle"] or "")
+    sp.text = sanitize_text(slide.get("subtitle") or (meta.get("deckSubtitle") or ""))
     sp.font.name = "Arial"; sp.font.size = Pt(20); sp.font.color.rgb = RGBColor(255,255,255)
     sub.text_frame.word_wrap = True
     return s
@@ -61,7 +94,8 @@ def add_text_slide(prs, meta, slide, header="", synk_logo_path=None, client_logo
     # header - fit within 10" slide width with margins
     hdr = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9.0), Inches(0.6))
     hp = hdr.text_frame.paragraphs[0]
-    hp.text = slide["title"] if not header else header + " – " + slide["title"]
+    title_text = slide["title"] if not header else header + " - " + slide["title"]
+    hp.text = sanitize_text(title_text)
     hp.font.name = "Arial"; hp.font.size = Pt(28); hp.font.bold = True
     hp.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
     hdr.text_frame.word_wrap = True
@@ -74,11 +108,11 @@ def add_text_slide(prs, meta, slide, header="", synk_logo_path=None, client_logo
     if isinstance(content, list):
         for i, item in enumerate(content):
             p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-            p.text = item; p.font.name = "Arial"; p.font.size = Pt(20)
+            p.text = sanitize_text(item); p.font.name = "Arial"; p.font.size = Pt(20)
             p.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
     elif isinstance(content, str):
         p = tf.paragraphs[0]
-        p.text = content; p.font.name = "Arial"; p.font.size = Pt(20)
+        p.text = sanitize_text(content); p.font.name = "Arial"; p.font.size = Pt(20)
         p.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
     else:
         tf.paragraphs[0].text = ""
@@ -91,7 +125,7 @@ def add_table_slide(prs, meta, slide, headers: List[str], rows: List[List[str]],
     # header - fit within 10" slide width with margins
     hdr = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9.0), Inches(0.6))
     hp = hdr.text_frame.paragraphs[0]
-    hp.text = slide["title"]
+    hp.text = sanitize_text(slide["title"])
     hp.font.name = "Arial"; hp.font.size = Pt(28); hp.font.bold = True
     hp.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
     # table - fit within 10" slide width with margins
@@ -99,14 +133,14 @@ def add_table_slide(prs, meta, slide, headers: List[str], rows: List[List[str]],
     accent = hex_to_rgb(meta["style"]["colors"]["accent1"])
     for j,h in enumerate(headers):
         cell = table.cell(0,j)
-        cell.text = h
+        cell.text = sanitize_text(h)
         cell.fill.solid(); cell.fill.fore_color.rgb = accent
         cell.text_frame.paragraphs[0].font.name = "Arial"
         cell.text_frame.paragraphs[0].font.bold = True
     for i,r in enumerate(rows, start=1):
         for j,val in enumerate(r):
             cell = table.cell(i,j)
-            cell.text = val
+            cell.text = sanitize_text(val)
             cell.text_frame.paragraphs[0].font.name = "Arial"
     return s
 
