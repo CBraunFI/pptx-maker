@@ -342,6 +342,46 @@ All colors must be provided as hex codes (e.g., `#06206F`).
 - **Word wrap:** Enabled automatically
 - **Special characters:** UTF-8 supported (ä, ö, ü, ß, €, etc.)
 
+### Character Encoding Best Practices
+
+**IMPORTANT: The API automatically sanitizes Unicode characters to prevent encoding errors.**
+
+To ensure maximum compatibility, **avoid** using the following Unicode characters in your JSON:
+
+❌ **Characters to AVOID:**
+- Em-dash: `–` (U+2013) → Use regular hyphen `-` instead
+- En-dash: `—` (U+2014) → Use regular hyphen `-` instead
+- Smart quotes: `"` `"` (U+201C, U+201D) → Use straight quotes `"` instead
+- Smart single quotes: `'` `'` (U+2018, U+2019) → Use straight apostrophe `'` instead
+- Ellipsis: `…` (U+2026) → Use three periods `...` instead
+- Non-breaking space: ` ` (U+00A0) → Use regular space instead
+
+✅ **Safe Characters:**
+- Regular hyphen: `-`
+- Straight quotes: `"` and `'`
+- Regular space: ` `
+- Three periods: `...`
+- German umlauts: `ä`, `ö`, `ü`, `ß`
+- Common symbols: `€`, `@`, `&`, `%`
+
+**Example - WRONG:**
+```json
+{
+  "title": "Leadership Journey – 2026",
+  "content": "We're ready… let's begin!"
+}
+```
+
+**Example - CORRECT:**
+```json
+{
+  "title": "Leadership Journey - 2026",
+  "content": "We're ready... let's begin!"
+}
+```
+
+**Note:** The API will automatically convert problematic Unicode characters to ASCII equivalents, but it's best practice to use ASCII-safe characters from the start to avoid any potential data loss.
+
 ### Content Length Recommendations
 - **Title:** Max 60 characters
 - **Subtitle:** Max 80 characters
@@ -368,6 +408,7 @@ All colors must be provided as hex codes (e.g., `#06206F`).
 - Invalid color format (not hex)
 - File system errors
 - Rendering errors
+- ~~Unicode encoding errors (FIXED: Now automatically sanitized)~~
 
 ### Validation Requirements
 1. All required fields must be present
@@ -375,6 +416,7 @@ All colors must be provided as hex codes (e.g., `#06206F`).
 3. Dates should follow ISO format (YYYY-MM-DD)
 4. Slide IDs must be unique within a deck
 5. Slide type must be one of the supported types
+6. **Use ASCII-safe characters** (no Em-dashes, smart quotes, etc.)
 
 ---
 
@@ -493,7 +535,14 @@ const blob = new Blob(
 - Verify filenames match exactly (case-sensitive on some systems)
 - Place logo files in the application directory
 
-### 5. Error Recovery
+### 5. Character Encoding
+- **Always use ASCII-safe characters** in all text fields
+- Replace Em-dashes `–` with regular hyphens `-`
+- Replace smart quotes `"` `'` with straight quotes `"` `'`
+- Replace ellipsis `…` with three periods `...`
+- The API will sanitize Unicode automatically, but prevention is better
+
+### 6. Error Recovery
 - Validate JSON before sending
 - Check all required fields are present
 - Verify color format (# + 6 hex digits)
@@ -623,15 +672,35 @@ Content-Type: application/json
 - Split into multiple slides
 - Use shorter bullet points
 
+**"Unicode/latin-1 encoding" errors (legacy):**
+- This should no longer occur (fixed in v1.1)
+- If you encounter this, the API auto-sanitizes problematic characters
+- For best results, use ASCII-safe characters (see Character Encoding Best Practices above)
+
 ---
 
 ## Version Information
 
-- **API Version:** 1.0
+- **API Version:** 1.1
 - **Slide Format:** 16:9 (10" × 5.625")
 - **Font:** Arial
 - **Logo Support:** Dual logos (SYNK + Client)
+- **Unicode Handling:** Automatic sanitization (v1.1+)
 - **Last Updated:** 2025-10-14
+
+### Changelog
+
+**v1.1 (2025-10-14)**
+- ✅ Added automatic Unicode character sanitization
+- ✅ Fixed latin-1 encoding errors with Em-dashes, smart quotes, etc.
+- ✅ Improved Power Automate compatibility
+- ℹ️ API now auto-converts problematic Unicode to ASCII equivalents
+
+**v1.0 (2025-10-14)**
+- Initial release
+- 24 slide types
+- Dual logo support
+- Base64 and bytes endpoints
 
 ---
 
