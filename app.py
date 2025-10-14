@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from models import RenderRequest, RenderResponse
-from pptx_builder import build_base64, build_pptx
+from pptx_builder import build_base64, build_pptx, sanitize_text
 
 app = FastAPI(title="PPTX Maker")
 
@@ -16,13 +16,18 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"status": "ok", "service": "pptx-maker"}
+    return {
+        "status": "ok",
+        "service": "pptx-maker",
+        "version": "1.1",
+        "features": ["unicode-sanitization"]
+    }
 
 @app.post("/render", response_model=RenderResponse)
 def render_pptx(req: RenderRequest):
     try:
-        customer = req.deck.meta.customer
-        title = req.deck.meta.deckTitle
+        customer = sanitize_text(req.deck.meta.customer)
+        title = sanitize_text(req.deck.meta.deckTitle)
         filename = f"{customer} - {title}.pptx"
         result = build_base64(req.deck.model_dump(), filename)
         return result
@@ -36,8 +41,8 @@ def render_pptx_bytes(req: RenderRequest):
     Response will be application/vnd.openxmlformats-officedocument.presentationml.presentation
     """
     try:
-        customer = req.deck.meta.customer
-        title = req.deck.meta.deckTitle
+        customer = sanitize_text(req.deck.meta.customer)
+        title = sanitize_text(req.deck.meta.deckTitle)
         filename = f"{customer} - {title}.pptx"
         pptx_bytes = build_pptx(req.deck.model_dump())
 
