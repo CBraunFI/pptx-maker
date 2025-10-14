@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# Generated files
+*.pptx
+*.log
+nul
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test outputs
+test_output*.pptx
+test_bytes_output.pptx
+server.log
+
+# Local development
+templates/
+input_*.json
