@@ -6,6 +6,9 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from typing import List, Union
 
+# ---- Proof flag / version tag ----
+BUILDER_VERSION = "v2-2025-10-16"
+
 def hex_to_rgb(hexstr: str):
     hexstr = hexstr.lstrip("#")
     return RGBColor(int(hexstr[0:2],16), int(hexstr[2:4],16), int(hexstr[4:6],16))
@@ -51,6 +54,24 @@ def add_logos(slide, synk_logo_path, client_logo_path, slide_width, slide_height
         except Exception:
             pass
 
+def add_version_badge(slide, meta, prs):
+    """Small version tag in bottom-right corner as visual proof of the deployed builder."""
+    try:
+        text = f"builder {meta.get('builder_version', '')}".strip()
+        if not text:
+            text = f"builder {BUILDER_VERSION}"
+        # place small, unobtrusive text in bottom-right
+        tb = slide.shapes.add_textbox(prs.slide_width - Inches(2.6), prs.slide_height - Inches(0.55), Inches(2.3), Inches(0.4))
+        p = tb.text_frame.paragraphs[0]
+        p.text = sanitize_text(text)
+        p.font.name = "Arial"
+        p.font.size = Pt(9)
+        # use accent color to be visible but subtle
+        p.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["accent1"])
+    except Exception:
+        # never fail the render just because of a badge
+        pass
+
 def add_title_slide(prs, meta, slide):
     s = prs.slides.add_slide(prs.slide_layouts[6])  # blank
     # background (primary)
@@ -69,6 +90,8 @@ def add_title_slide(prs, meta, slide):
     sp.text = sanitize_text(slide.get("subtitle") or (meta.get("deckSubtitle") or ""))
     sp.font.name = "Arial"; sp.font.size = Pt(20); sp.font.color.rgb = RGBColor(255,255,255)
     sub.text_frame.word_wrap = True
+    # version badge
+    add_version_badge(s, meta, prs)
     return s
 
 def _normalize_content_from_slide(slide: dict) -> List[str]:
@@ -167,6 +190,8 @@ def add_text_slide(prs, meta, slide, header="", synk_logo_path=None, client_logo
     content_list = _normalize_content_from_slide(slide)
     if not content_list:
         tf.paragraphs[0].text = ""
+        # version badge even if empty
+        add_version_badge(s, meta, prs)
         return s
 
     for i, item in enumerate(content_list):
@@ -174,6 +199,9 @@ def add_text_slide(prs, meta, slide, header="", synk_logo_path=None, client_logo
         p.text = item
         p.font.name = "Arial"; p.font.size = Pt(20)
         p.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
+
+    # version badge
+    add_version_badge(s, meta, prs)
     return s
 
 def add_table_slide(prs, meta, slide, headers: List[str], rows: List[List[str]], synk_logo_path=None, client_logo_path=None):
@@ -201,6 +229,9 @@ def add_table_slide(prs, meta, slide, headers: List[str], rows: List[List[str]],
             cell = table.cell(i,j)
             cell.text = sanitize_text(val if val is not None else "")
             cell.text_frame.paragraphs[0].font.name = "Arial"
+
+    # version badge
+    add_version_badge(s, meta, prs)
     return s
 
 def build_pptx(deck: dict) -> bytes:
@@ -208,6 +239,9 @@ def build_pptx(deck: dict) -> bytes:
     prs.slide_width = Inches(10)
     prs.slide_height = Inches(5.625)
     meta = deck["meta"]
+
+    # inject builder version into meta for debugging / headers upstream
+    meta["builder_version"] = BUILDER_VERSION
 
     # logos
     synk_logo_path = meta.get("style", {}).get("logo")
@@ -288,7 +322,7 @@ def build_pptx(deck: dict) -> bytes:
                         left,right = c.split("–",1)
                         rows.append([left.strip(), "", right.strip()])
                     else:
-                        rows.append([str(c), "", ""])
+                        rows.append([str(c), "", ""] )
                 add_table_slide(prs, meta, sl, headers, rows or [["—","","—"]], synk_logo_path=synk_logo_path, client_logo_path=client_logo_path)
 
         else:
