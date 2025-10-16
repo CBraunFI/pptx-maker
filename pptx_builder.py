@@ -182,7 +182,7 @@ def add_text_slide(prs, meta, slide, header="", synk_logo_path=None, client_logo
     hp.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
     hdr.text_frame.word_wrap = True
 
-    # body
+    # body (Lead + Bullets)
     left, top, width, height = Inches(0.5), Inches(1.3), Inches(9.0), Inches(3.8)
     tb = s.shapes.add_textbox(left, top, width, height)
     tf = tb.text_frame; tf.clear(); tf.word_wrap = True
@@ -194,13 +194,65 @@ def add_text_slide(prs, meta, slide, header="", synk_logo_path=None, client_logo
         add_version_badge(s, meta, prs)
         return s
 
-    for i, item in enumerate(content_list):
-        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-        p.text = item
-        p.font.name = "Arial"; p.font.size = Pt(20)
+    # Lead (erster Eintrag, normaler Absatz)
+    lead = content_list[0]
+    p0 = tf.paragraphs[0]
+    p0.text = lead
+    p0.font.name = "Arial"; p0.font.size = Pt(20)
+    p0.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
+
+    # Bullets (alle restlichen Einträge)
+    for item in content_list[1:]:
+        p = tf.add_paragraph()
+        p.text = f"• {item}"
+        p.font.name = "Arial"; p.font.size = Pt(18)
         p.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
 
     # version badge
+    add_version_badge(s, meta, prs)
+    return s
+
+def add_two_col_text_slide(prs, meta, title: str, left_lines, right_lines,
+                           left_width_in=4.3, gap_in=0.4, synk_logo_path=None, client_logo_path=None):
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    add_logos(s, synk_logo_path, client_logo_path, prs.slide_width, prs.slide_height)
+
+    # Header
+    hdr = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9.0), Inches(0.6))
+    hp = hdr.text_frame.paragraphs[0]
+    hp.text = sanitize_text(title)
+    hp.font.name = "Arial"; hp.font.size = Pt(28); hp.font.bold = True
+    hp.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
+
+    # Spalten-Geometrie
+    left = Inches(0.5); top = Inches(1.3); height = Inches(3.8)
+    left_w = Inches(left_width_in)
+    right_w = Inches(9.0 - left_width_in - gap_in)
+    right = left + left_w + Inches(gap_in)
+
+    # Linke Spalte (Lead + Bullets)
+    ltb = s.shapes.add_textbox(left, top, left_w, height)
+    ltf = ltb.text_frame; ltf.clear(); ltf.word_wrap = True
+    if left_lines:
+        p0 = ltf.paragraphs[0]
+        p0.text = sanitize_text(left_lines[0])
+        p0.font.name = "Arial"; p0.font.size = Pt(20)
+        p0.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
+        for line in left_lines[1:]:
+            p = ltf.add_paragraph(); p.text = f"• {sanitize_text(line)}"
+            p.font.name = "Arial"; p.font.size = Pt(18)
+            p.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
+
+    # Rechte Spalte (nur Bullets)
+    rtb = s.shapes.add_textbox(right, top, right_w, height)
+    rtf = rtb.text_frame; rtf.clear(); rtf.word_wrap = True
+    if right_lines:
+        for i, line in enumerate(right_lines):
+            p = rtf.paragraphs[0] if i == 0 else rtf.add_paragraph()
+            p.text = f"• {sanitize_text(line)}"
+            p.font.name = "Arial"; p.font.size = Pt(18)
+            p.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
+
     add_version_badge(s, meta, prs)
     return s
 
@@ -215,20 +267,39 @@ def add_table_slide(prs, meta, slide, headers: List[str], rows: List[List[str]],
     hp.font.name = "Arial"; hp.font.size = Pt(28); hp.font.bold = True
     hp.font.color.rgb = hex_to_rgb(meta["style"]["colors"]["text"])
 
-    # table
-    table = s.shapes.add_table(len(rows)+1, len(headers), Inches(0.5), Inches(1.3), Inches(9.0), Inches(3.8)).table
+    # table (schöne Spaltenbreiten + rechtsbündiger Preis)
+    rows_count = max(1, len(rows)) + 1
+    cols = len(headers)
+    table = s.shapes.add_table(rows_count, cols, Inches(0.5), Inches(1.3), Inches(9.0), Inches(3.8)).table
+
+    # Spaltenbreiten (Position | Hinweis | Preis)
+    if cols == 3:
+        table.columns[0].width = Inches(4.6)
+        table.columns[1].width = Inches(2.6)
+        table.columns[2].width = Inches(1.8)
+
     accent = hex_to_rgb(meta["style"]["colors"]["accent1"])
-    for j,h in enumerate(headers):
-        cell = table.cell(0,j)
+    text_color = hex_to_rgb(meta["style"]["colors"]["text"])
+
+    # Header
+    for j, h in enumerate(headers):
+        cell = table.cell(0, j)
         cell.text = sanitize_text(h)
         cell.fill.solid(); cell.fill.fore_color.rgb = accent
-        cell.text_frame.paragraphs[0].font.name = "Arial"
-        cell.text_frame.paragraphs[0].font.bold = True
-    for i,r in enumerate(rows, start=1):
-        for j,val in enumerate(r):
-            cell = table.cell(i,j)
-            cell.text = sanitize_text(val if val is not None else "")
-            cell.text_frame.paragraphs[0].font.name = "Arial"
+        ph = cell.text_frame.paragraphs[0]
+        ph.font.name = "Arial"; ph.font.size = Pt(12); ph.font.bold = True
+
+    # Datenzeilen
+    for i, r in enumerate(rows, start=1):
+        for j, val in enumerate(r):
+            cell = table.cell(i, j)
+            cell.text = sanitize_text("" if val is None else str(val))
+            p = cell.text_frame.paragraphs[0]
+            p.font.name = "Arial"; p.font.size = Pt(12)
+            p.font.color.rgb = text_color
+            # Preis-Spalte rechtsbündig
+            if cols >= 3 and j == cols - 1:
+                p.alignment = 2  # 0=left, 1=center, 2=right
 
     # version badge
     add_version_badge(s, meta, prs)
@@ -292,38 +363,46 @@ def build_pptx(deck: dict) -> bytes:
             add_text_slide(prs, meta, sl, header="Modul", synk_logo_path=synk_logo_path, client_logo_path=client_logo_path)
 
         elif t == "team":
-            # Accept 'members' or 'trainers'
-            sl2 = dict(sl)
-            lines = _normalize_content_from_slide(sl)  # will pick up members/trainers
-            if lines:
-                sl2["content"] = lines
-            add_text_slide(prs, meta, sl2, header="Team", synk_logo_path=synk_logo_path, client_logo_path=client_logo_path)
+            # Linke Spalte: optionaler Intro-Text
+            left_lines = []
+            if isinstance(sl.get("text"), str) and sl["text"].strip():
+                left_lines.append(sl["text"])
+
+            # Rechte Spalte: Members/Trainers als Liste
+            lines = _normalize_content_from_slide(sl)  # holt members/trainers + evtl. text/bullets/items
+            if not lines:
+                lines = ["tbd"]
+
+            add_two_col_text_slide(
+                prs, meta, f"Team - {sl.get('title','')}",
+                left_lines=left_lines,
+                right_lines=lines,
+                synk_logo_path=synk_logo_path,
+                client_logo_path=client_logo_path
+            )
 
         elif t == "investment":
-            # Prefer structured items [{label,value,note}], fallback to 'content' parsing
+            # Prefer structured items [{label,value,note}], fallback zu 'content'
             items = sl.get("items")
+            headers = ["Position","Hinweis","Preis"]
+            rows = []
             if isinstance(items, list) and items and isinstance(items[0], dict):
-                headers = ["Position","Hinweis","Preis"]
-                rows = []
                 for it in items:
                     rows.append([
                         it.get("label",""),
                         it.get("note",""),
                         it.get("value","")
                     ])
-                add_table_slide(prs, meta, sl, headers, rows, synk_logo_path=synk_logo_path, client_logo_path=client_logo_path)
             else:
-                # legacy 'content' lines: "Label – Preis"
-                headers = ["Position","Hinweis","Preis"]
-                rows = []
                 content = sl.get("content") or []
                 for c in content:
                     if isinstance(c, str) and "–" in c:
                         left,right = c.split("–",1)
                         rows.append([left.strip(), "", right.strip()])
                     else:
-                        rows.append([str(c), "", ""] )
-                add_table_slide(prs, meta, sl, headers, rows or [["—","","—"]], synk_logo_path=synk_logo_path, client_logo_path=client_logo_path)
+                        rows.append([str(c), "", ""])
+            add_table_slide(prs, meta, sl, headers, rows or [["—","","—"]],
+                            synk_logo_path=synk_logo_path, client_logo_path=client_logo_path)
 
         else:
             # Unknown types render as simple text slide using normalized content
